@@ -1,3 +1,4 @@
+
 <?php
 
 $shortopts = "u:p:h:n:";
@@ -9,16 +10,14 @@ error_reporting(E_ERROR);
 /*--- INITIATING HELP MESSAGE ---*/
 const help_responce = <<<EOD
 The following set of commands is specified for current PHP script:
-• --file [csv file name] – this is the name of the CSV to be parsed
-• --create_table – this will cause the PostgreSQL users table to be built (and no further action
-    will be taken because of the conditions of the task)
-• --dry_run – this will be used with the --file directive in case we want to run the script but not
-    insert into the DB. All other functions will be executed, but the database won't be altered
-• -u – PostgreSQL username
-• -p – PostgreSQL password
-• -h – PostgreSQL host in a format: host:port. If port is not specified, default port 5432 will be set.
-• -n – PostgreSQL database name. If not specified, default database will be used
-• --help – outputs the list of directives with details.
+• --file [csv file name]   – this is the name of the CSV-file to be parsed (REQUIRED)
+• --create_table [table name]   – this will cause the PostgreSQL users table to be built (and no further action will be taken because of the conditions of the task)
+• --dry_run   – this should be used with at least the --file directive in case of running the script without creating table / inserting data into the DB. All other functions will be executed, but the database won't be altered
+• -u   – PostgreSQL username (REQUIRED if not dry_run)
+• -p   – PostgreSQL password (REQUIRED if not dry_run)
+• -h   – PostgreSQL host (REQUIRED if not dry_run). Can be used in a format: host:port or host only. If port is not specified, default port 5432 will be set.
+• -n   – PostgreSQL database name. If not specified, default database will be used
+• --help   – Outputs the list of directives with details.
 EOD;
 if (isset($options["help"])) exit(help_responce.PHP_EOL); // return help if parameter is specified
 
@@ -96,8 +95,8 @@ if ($file_path != null) {
 }
 
 if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
-    echo "--create table parameter is not specified. 
-File with table name to insert data does not exist".PHP_EOL;
+    echo "--create table directive is not specified. Also file with table name to insert data does not exist.
+No further actions will be taken".PHP_EOL;
     exit();
 }
 
@@ -129,7 +128,7 @@ if (isset($options[ "create_table" ])) // parameter is specified
     if ($is_dry_run) echo "DRY_RUN mode. No tables will be created." . PHP_EOL;
     else {
         if ($t_exist == null) {
-
+            pg_query($dbconn, 'begin;');
             pg_prepare($dbconn, "create_table", $q_create_table);
             pg_execute($dbconn, "create_table", []);
             pg_query($dbconn, 'commit;');
@@ -159,7 +158,7 @@ if (!$is_dry_run) {
     $t_exist = pg_fetch_row(pg_execute($dbconn, "check_table_name", [$ins_table_name]))[ 0 ];
 
     if ($t_exist == null) {
-        echo "There is no table with $ins_table_name name in the database to insert data. 
+        echo "There is no table with $ins_table_name name in the database to insert data.
 Please create table first using --create_table parameter" . PHP_EOL;
         exit();
     } else {
