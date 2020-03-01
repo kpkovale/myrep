@@ -1,4 +1,3 @@
-
 <?php
 
 $shortopts = "u:p:h:n:";
