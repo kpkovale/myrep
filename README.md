@@ -5,12 +5,20 @@ The following information is related to user_upload.php script (Script further i
 Information and requirements:
 1. Operating System. The Script execution has been checked on both OS Windows 10 and Ubuntu 18.04.
 2. PHP version. For successul exectution, PHP version 7.2 or above is required. (the same as in the task)
-3. PHP Libraries. No additional libraries for PHP need to be installed.
+3. PHP Libraries. Postgres compatibility package for PHP is recommended:
+  sudo apt-get install php7.2-pgsql
 4. Database. The Postgres database ver 10.4 was used during testing and is recommended to be installed.
    However PostgreSQL ver 9.5 should also be sufficient.
 5. Database. According to task conditions, only "create table" and "insert" operations are specified.
    Therefore at least one database on the host machine is reqiured.
 6. Web-server. For successful PHP and Database interaction apache2 or nginx web-server is required.
+
+To install necessary components the below list of commands is recommended:
+- sudo apt install php - Enables php usage on current machine. You can use "sudo apt show php" to check ht version link in your repository.
+For latest version installation use "sudo apt update" or specify php version with "sudo apt install php7.2" command.
+- sudo apt-get install php7.2-pgsql - Enables Postgres compatibility package for PHP
+- Apache2 web-server "sudo apt-get install apache2" or Nginx web-server "sudo apt install nginx"
+- sudo apt install postgresql - Allows to install PostgreSQL server on you local machine
 
 Assumptions for Command Line Directives:
 --file [file name]
