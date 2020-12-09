@@ -44,7 +44,7 @@ On the next run without --create_table parameter, the data will be inserted to t
 If no -create_table actions were made before and "write_table_name.tmp" file does not exist in the current directory, user exception will be shown in the STDOUT.
 
 *   --dry_run
-The dry run mode requires at leas --file directive to be specified. Other directives are not necessary with --dry_run.
+The dry run mode requires at least --file directive to be specified. Other directives are not necessary with --dry_run.
 
 *   --help
 The directive provides infromation for all acceptable commands for user_upload.php Script
