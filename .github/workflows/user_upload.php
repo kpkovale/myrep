@@ -6,18 +6,75 @@ $longopts = ["file:","create_table:","dry_run","help"];
 $options = getopt($shortopts, $longopts);
 
 error_reporting(E_ERROR);
+
+/*checking user's mistakes in commands syntax*/
+function check_options($shortopts, $longopts) {
+  $argv = $_SERVER['argv'];
+  $argc = $_SERVER['argc'];
+  $args_list = $argv; //recieving overall list of arguments
+  unset($args_list[0]); //remove file name from the arguments list
+  $optind = null;
+
+  $options = getopt($shortopts, $longopts, $optind);
+  /**/
+  if ($optind != $argc) {
+    $err_msg =
+"An error ocured on \"".($optind+1)."\" argument out of \"$argc\".
+The argument \"".$argv[$optind]."\" does not correspond to any available command.
+Use --help to check the list of available commands.".PHP_EOL;
+
+    return [False, $err_msg];
+  }
+
+  foreach ($args_list as $given_arg) {
+    $end_cicle = 0;
+    for ($i=1; $i <= count($options) ; $i++) {
+      if ($end_cicle === 1) break;
+      foreach ($options as $option_key => $option_value) {
+        if ($given_arg === "-".$option_key || $given_arg === "--".$option_key) {
+          $end_cicle = 1;
+          break;
+      }
+        elseif ($given_arg === $option_value) {
+          $end_cicle = 1;
+          break;
+      }
+        elseif ($given_arg === "-".$option_key."=".$option_value) {
+          $end_cicle = 1;
+          break;
+      }
+    }
+      if ($i == count($options) && $end_cicle == 0) {
+      $err_msg =
+"The argument \"".$given_arg."\" does not correspond to any available command.
+Use --help to check the list of available commands.".PHP_EOL;
+      return [False, $err_msg];
+      }
+    }
+  }
+  return [True, '']; // return True if no mistakes found
+}
+
+[$check_result, $err_msg] = check_options($shortopts, $longopts);
+if (!$check_result) {
+  echo $err_msg.PHP_EOL;
+  exit();
+}
+
 /*--- INITIATING HELP MESSAGE ---*/
 const help_responce = <<<EOD
-The following set of commands is specified for current PHP script:
+The following set of commands is specified for current PHP script.
+To define commands value both space or equality delimiters are fine.
+Example: < -u username > | < -u=username >
 • --file [csv file name] – this is the name of the CSV to be parsed
 • --create_table – this will cause the PostgreSQL users table to be built (and no further action
     will be taken because of the conditions of the task)
 • --dry_run – this will be used with the --file directive in case we want to run the script but not
     insert into the DB. All other functions will be executed, but the database won't be altered
-• -u – PostgreSQL username
-• -p – PostgreSQL password
-• -h – PostgreSQL host in a format: host:port. If port is not specified, default port 5432 will be set.
-• -n – PostgreSQL database name. If not specified, default database will be used
+• -u [username] – PostgreSQL username
+• -p [password] – PostgreSQL password
+• -h [host:port] – PostgreSQL host in a format: host:port. If port is not specified, default port 5432 will be set.
+• -n [DBName] – PostgreSQL database name. If not specified, "postgres" database will be used
 • --help – outputs the list of directives with details.
 EOD;
 if (isset($options["help"])) exit(help_responce.PHP_EOL); // return help if parameter is specified
@@ -96,7 +153,7 @@ if ($file_path != null) {
 }
 
 if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
-    echo "--create table parameter is not specified. 
+    echo "--create table parameter is not specified.
 File with table name to insert data does not exist".PHP_EOL;
     exit();
 }
@@ -159,7 +216,7 @@ if (!$is_dry_run) {
     $t_exist = pg_fetch_row(pg_execute($dbconn, "check_table_name", [$ins_table_name]))[ 0 ];
 
     if ($t_exist == null) {
-        echo "There is no table with $ins_table_name name in the database to insert data. 
+        echo "There is no table with $ins_table_name name in the database to insert data.
 Please create table first using --create_table parameter" . PHP_EOL;
         exit();
     } else {
