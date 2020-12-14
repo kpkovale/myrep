@@ -1,7 +1,7 @@
 <?php
 
 $shortopts = "u:p:h:n:";
-$longopts = ["file:","create_table:","dry_run","help"];
+$longopts = ["file:","create_table","dry_run","help"];
 
 $options = getopt($shortopts, $longopts);
 
@@ -63,18 +63,22 @@ if (!$check_result) {
 
 /*--- INITIATING HELP MESSAGE ---*/
 const help_responce = <<<EOD
+user_upload.php [-u=<...> & -p=<...> & -h=<...> [& -n=<...>]]
+                [--create_table] [--file=<...>] [--dry_run] [--help]
 The following set of commands is specified for current PHP script.
 To define commands value both space or equality delimiters are fine.
 Example: < -u username > | < -u=username >
 • --file [csv file name] – this is the name of the CSV to be parsed
-• --create_table – this will cause the PostgreSQL users table to be built (and no further action
-    will be taken because of the conditions of the task)
-• --dry_run – this will be used with the --file directive in case we want to run the script but not
-    insert into the DB. All other functions will be executed, but the database won't be altered
+• --create_table – this will cause the PostgreSQL "users" table to be built
+  (and no further action will be taken because of the conditions of the task)
+• --dry_run – this will be used with the --file directive in case we want
+  to run the script but not insert into the DB.
+  All other functions will be executed, but the database won't be altered
 • -u [username] – PostgreSQL username
 • -p [password] – PostgreSQL password
-• -h [host:port] – PostgreSQL host in a format: host:port. If port is not specified, default port 5432 will be set.
-• -n [DBName] – PostgreSQL database name. If not specified, "postgres" database will be used
+• -h [host:port] – PostgreSQL host in a format: host:port.
+  If the port is not specified, default port 5432 will be set.
+• -n [DBName] – PostgreSQL database name. If not specified, "username" database will be used
 • --help – outputs the list of directives with details.
 EOD;
 if (isset($options["help"])) exit(help_responce.PHP_EOL); // return help if parameter is specified
@@ -102,8 +106,8 @@ if (!$is_dry_run) {
 
         if (isset($options[ "n" ])) $dbname = $options[ "n" ]; // if database name parameter is specified
         else {
-            $dbname = '';
-            echo "DB NAME is not given. Using default." . PHP_EOL;
+            $dbname = $dbuser;
+            echo "DB NAME is not given. Using \"$dbuser\" database name to connect." . PHP_EOL;
         }
     }
 }
@@ -152,18 +156,32 @@ if ($file_path != null) {
     echo "Valid emails: $email_cnt | Invalid emails:". (count($file)-$email_cnt) . PHP_EOL;
 }
 
-if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
-    echo "--create table parameter is not specified.
-File with table name to insert data does not exist".PHP_EOL;
-    exit();
-}
+// if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
+//     echo "--create table parameter is not specified.
+// File with table name to insert data does not exist".PHP_EOL;
+//     exit();
+// }
+
+$connection_string = "host=$dbhost port=$dbport user=$dbuser password=$dbpwd dbname=$dbname";
+
 
 /*  --- HERE GOES DATABASE ACTIONS BLOCK --- */
 if ($is_dry_run) echo "DRY_RUN. No connection to the database will be made".PHP_EOL;
 else {
-    $dbconn = pg_connect("host=$dbhost port=$dbport user=$dbuser password=$dbpwd dbname=$dbname")
-    or die("Unable to establish database connection");
+    $dbconn = pg_connect($connection_string)
+    or die("Database has returned error: $connection_string
+    \"". error_get_last()['message']."\"
+    Unable to establish database connection\n");
+    // echo pg_result_error(pg_connect($connection_string,PGSQL_CONNECT_FORCE_NEW))."\n";
     echo "Connected to database successfully: $dbconn. DB name: " . pg_dbname($dbconn) . "\n";
+    // try {
+    //   $dbconn = pg_connect($connection_string);
+    // } catch (\Exception $e) {
+    //   echo $e->getMessage;
+    //   exit();
+    // }
+
+
 
     /* --- query to check if new table already exists --- */
     pg_prepare($dbconn, 'check_table_name', "SELECT table_name FROM information_schema.tables t WHERE t.table_name= $1");
@@ -172,7 +190,7 @@ else {
 /*  --- CHECKING WHETHER WE NEED TO CREATE NEW TABLE? --- */
 if (isset($options[ "create_table" ])) // parameter is specified
 {
-    $new_table_name = $options[ "create_table" ]; // putting table name into variable
+    $new_table_name = "users"; // putting table name into variable
     /* Forming a "create table" query */
     $q_create_table = "CREATE TABLE IF NOT EXISTS $new_table_name (
     id serial PRIMARY KEY NOT NULL,
@@ -192,8 +210,8 @@ if (isset($options[ "create_table" ])) // parameter is specified
             pg_query($dbconn, 'commit;');
             pg_close($dbconn);
 
-            file_put_contents("./write_table_name.tmp", $new_table_name);
-            exit("New table has been created. Table name is $new_table_name. Terminating script".PHP_EOL);
+            //file_put_contents("./write_table_name.tmp", $new_table_name);
+            exit("New table has been created. Table name is \"$new_table_name\".".PHP_EOL);
 
             /* Memorizing table name in the "*.tmp" file. On the next run this table name will be used to insert data */
         } else {
@@ -208,7 +226,7 @@ if (isset($options[ "create_table" ])) // parameter is specified
 /*  --- INSERTING DATA FROM FILE INTO DATABASE --- */
 
 /* getting table name from file after previous --create_table run*/
-$ins_table_name = file_get_contents("./write_table_name.tmp");
+$ins_table_name = "users";
 
 /*  --- CHECKING FOR DRY_RUN --- */
 if (!$is_dry_run) {
