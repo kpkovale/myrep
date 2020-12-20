@@ -95,7 +95,7 @@ if (isset($options["p"])) $dbpwd = $options["p"];  // if password parameter is s
 if (isset($options["h"])) $dbhost = $options["h"]; // if host parameter is specified
 if (!$is_dry_run) {
     if ($dbuser == null or $dbpwd == null or $dbhost == null) {
-        exit("User exception: Database connection parameters are required. Please restart the script using correct parameters");
+        exit("Script defined exception: Database connection parameters are required. Please restart the script using correct parameters");
     } else {
         /* Checking "host" format as "host:port" or "host" only */
         if (strpos($dbhost, ':') !== false) {
@@ -111,18 +111,18 @@ if (!$is_dry_run) {
         }
     }
 }
+If (!isset($options[ "create_table" ])) {
+  if (!isset($options["file"]) || empty($options["file"])) {
+      exit("Script defined exception: File path or file name is required. Please restart the script using correct parameters".PHP_EOL);
+  }
 
-if (!isset($options["file"]) || empty($options["file"])) {
-    exit("User exception: File path or file name is required. Please restart the script using correct parameters".PHP_EOL);
+  else {
+      $file_path = $options["file"]; // if --file parameter is not empty
+      if (strpos($file_path,'[') == 0 and strpos($file_path,']') == strlen($file_path) - 1) {
+          $file_path = substr($file_path,1,strlen($file_path)-2);
+      }
+  }
 }
-
-else {
-    $file_path = $options["file"]; // if --file parameter is not empty
-    if (strpos($file_path,'[') == 0 and strpos($file_path,']') == strlen($file_path) - 1) {
-        $file_path = substr($file_path,1,strlen($file_path)-2);
-    }
-}
-
 
 
 
@@ -130,6 +130,11 @@ else {
 if ($file_path != null) {
     /*   --- inserting file data into array ---   */
     $f_lines = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+    if ($f_lines === false) {
+      exit("file \"$file_path\" is empty. No records were found. Please try another file.\n");
+    }
+
     for ($i = 0; $i < count($f_lines); $i++) {
         $file[$i] = explode(";", $f_lines[$i]);
     }
@@ -217,7 +222,7 @@ if (isset($options[ "create_table" ])) // parameter is specified
         } else {
             echo "Table with name " . $t_exist . " already exists" . PHP_EOL;
             pg_close($dbconn);
-            exit ('--create_table parameter is given. Task conditions require to terminate script execution.'.PHP_EOL);
+            exit ('--create_table parameter was given. Task conditions require to terminate script execution.'.PHP_EOL);
         }
     }
 
