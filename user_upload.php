@@ -7,8 +7,10 @@ $options = getopt($shortopts, $longopts);
 
 error_reporting(E_ERROR);
 
-/*checking user's mistakes in commands syntax*/
+/*--- HERE GOES FUNCTIONS BLOCK ---*/
+
 function check_options($shortopts, $longopts) {
+  /* function checks user's mistakes in commands syntax*/
   $argv = $_SERVER['argv'];
   $argc = $_SERVER['argc'];
   $args_list = $argv; //recieving overall list of arguments
@@ -61,7 +63,46 @@ if (!$check_result) {
   exit();
 }
 
-/*--- INITIATING HELP MESSAGE ---*/
+function request_password_hidden($prompt='') {
+    // function hides output
+    // and returns string entered in terminal
+    readline_callback_handler_install('', function(){});
+    if (isset($prompt)) {
+      echo $prompt."\n";
+    }
+    echo("Password: ");
+    $strHidden = '';
+    while (True) {
+      $strChar = stream_get_contents(STDIN, 1);
+      if ($strChar === chr(10)) {
+        break;
+      }
+      elseif (($strChar===chr(127)) && (strlen($strHidden)!=0)) {
+        $strHidden = rtrim($strHidden, $strHidden[strlen($strHidden)-1]);
+      }
+      else {
+        $strHidden .= $strChar;
+      }
+    }
+    readline_callback_handler_remove();
+    return $strHidden;
+}
+
+function assign_dbconn_variables($options, $paramKeys){
+  /* funcion returns values from array by given keys */
+  $arrayToAssign = array();
+  foreach ($paramKeys as $keyName) {
+    if (isset($options[$keyName])) {
+      $arrayToAssign[] = $options[$keyName] ;
+    }
+    else {
+      $arrayToAssign[] = '' ;
+    }
+  }
+  return $arrayToAssign;
+}
+
+/*--- HELP MESSAGE ---*/
 const help_responce = <<<EOD
 user_upload.php [-u=<...> & -p=<...> & -h=<...> [& -n=<...>]]
                 [--create_table] [--file=<...>] [--dry_run] [--help]
@@ -90,24 +131,27 @@ if (isset($options["dry_run"])) {
 } else $is_dry_run = false;
 
 /* --- ASSIGNING DATABASE CONNECTION PARAMETERS TO VARIABLES --- */
-if (isset($options["u"])) $dbuser = $options["u"]; // if user parameter is specified
-if (isset($options["p"])) $dbpwd = $options["p"];  // if password parameter is specified
-if (isset($options["h"])) $dbhost = $options["h"]; // if host parameter is specified
+//if (isset($options["u"])) $dbUser = $options["u"]; // if user parameter is specified
+// if (isset($options["p"])) $dbPassword = $options["p"];  // if password parameter is specified
+// if (isset($options["h"])) $dbHost = $options["h"]; // if host parameter is specified
+
+[$dbUser, $dbPassword, $dbHost, $dbName] = assign_dbconn_variables($options, ['u','p','h','n']);
+
 if (!$is_dry_run) {
-    if ($dbuser == null or $dbpwd == null or $dbhost == null) {
+    if ($dbUser == null or $dbPassword == null or $dbHost == null) {
         exit("Script defined exception: Database connection parameters are required. Please restart the script using correct parameters");
     } else {
         /* Checking "host" format as "host:port" or "host" only */
-        if (strpos($dbhost, ':') !== false) {
-            $dbhp = explode(':', $dbhost);
-            $dbhost = $dbhp[ 0 ];
-            $dbport = $dbhp[ 1 ];
-        } else $dbport = '5432';
+        if (strpos($dbHost, ':') !== false) {
+            $dbhp = explode(':', $dbHost);
+            $dbHost = $dbhp[ 0 ];
+            $dbPort = $dbhp[ 1 ];
+        } else $dbPort = '5432';
 
-        if (isset($options[ "n" ])) $dbname = $options[ "n" ]; // if database name parameter is specified
+        if (isset($options[ "n" ])) $dbName = $options[ "n" ]; // if database name parameter is specified
         else {
-            $dbname = $dbuser;
-            echo "DB NAME is not given. Using \"$dbuser\" database name to connect." . PHP_EOL;
+            $dbName = $dbUser;
+            echo "DB NAME is not given. Using \"$dbUser\" database name to connect." . PHP_EOL;
         }
     }
 }
@@ -167,7 +211,7 @@ if ($file_path != null) {
 //     exit();
 // }
 
-$connection_string = "host=$dbhost port=$dbport user=$dbuser password=$dbpwd dbname=$dbname";
+$connection_string = "host=$dbHost port=$dbPort user=$dbUser password=$dbPassword dbname=$dbName";
 
 
 /*  --- HERE GOES DATABASE ACTIONS BLOCK --- */
