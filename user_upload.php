@@ -64,8 +64,10 @@ if (!$check_result) {
 }
 
 function request_password_hidden($prompt='') {
+
     // function hides output
     // and returns string entered in terminal
+
     readline_callback_handler_install('', function(){});
     if (isset($prompt)) {
       echo $prompt."\n";
@@ -88,18 +90,60 @@ function request_password_hidden($prompt='') {
     return $strHidden;
 }
 
-function assign_dbconn_variables($options, $paramKeys){
+function get_dbconn_var_values($optionsArray, $paramKeys){
+
   /* funcion returns values from array by given keys */
-  $arrayToAssign = array();
+
+  $resultingArray = array();
   foreach ($paramKeys as $keyName) {
-    if (isset($options[$keyName])) {
-      $arrayToAssign[] = $options[$keyName] ;
+    if (isset($optionsArray[$keyName])) {
+      $resultingArray[] = $optionsArray[$keyName] ;
     }
     else {
-      $arrayToAssign[] = '' ;
+      $resultingArray[] = '' ;
     }
   }
-  return $arrayToAssign;
+  return $resultingArray;
+}
+
+function check_param_value($paramName='',$paramValue) {
+
+  /* checks for mandatory parameters' values and requests input for empy ones */
+
+  $defaultValue = '';
+  $functionToCall = 'readline';
+  switch (strtolower($paramName)) {
+    case 'username':
+      $defaultValue = 'postgres';
+      $functionToCall = 'readline';
+      break;
+    case 'password':
+      $defaultValue = 'Administrator';
+      $functionToCall = 'request_password_hidden';
+      break;
+    case 'host':
+      $defaultValue = '127.0.0.1:5432';
+      $functionToCall = 'readline';
+      break;
+    case 'db name':
+      $defaultValue = 'postgres';
+      $functionToCall = 'readline';
+      break;
+    default:
+      exit("Unable to recognize parameter name $paramName \n");
+      break;
+}
+    while (!$paramValue) {
+      echo "Parameter \"$paramName\" is not set while required".PHP_EOL;
+      $userPick = readline("\"Y/y\" to set new value OR \"N/n\" for default ($defaultValue): ");
+      if (strtoupper($userPick) === "Y") {
+        $paramValue = call_user_func($functionToCall, "Enter $paramName: ");
+      }
+      elseif (strtoupper($userPick) === "N") {
+        $paramValue = $defaultValue;
+      }
+  }
+      return $paramValue;
 }
 
 /*--- HELP MESSAGE ---*/
@@ -109,18 +153,22 @@ user_upload.php [-u=<...> & -p=<...> & -h=<...> [& -n=<...>]]
 The following set of commands is specified for current PHP script.
 To define commands value both space or equality delimiters are fine.
 Example: < -u username > | < -u=username >
+• --help – outputs the list of directives with details.
 • --file [csv file name] – this is the name of the CSV to be parsed
 • --create_table – this will cause the PostgreSQL "users" table to be built
   (and no further action will be taken because of the conditions of the task)
 • --dry_run – this will be used with the --file directive in case we want
   to run the script but not insert into the DB.
   All other functions will be executed, but the database won't be altered
+  --- ---
+  The set of options listed below can be ommited.
+  However, user input will be requested during the script execution.
 • -u [username] – PostgreSQL username
 • -p [password] – PostgreSQL password
 • -h [host:port] – PostgreSQL host in a format: host:port.
   If the port is not specified, default port 5432 will be set.
 • -n [DBName] – PostgreSQL database name. If not specified, "username" database will be used
-• --help – outputs the list of directives with details.
+
 EOD;
 if (isset($options["help"])) exit(help_responce.PHP_EOL); // return help if parameter is specified
 
@@ -135,26 +183,22 @@ if (isset($options["dry_run"])) {
 // if (isset($options["p"])) $dbPassword = $options["p"];  // if password parameter is specified
 // if (isset($options["h"])) $dbHost = $options["h"]; // if host parameter is specified
 
-[$dbUser, $dbPassword, $dbHost, $dbName] = assign_dbconn_variables($options, ['u','p','h','n']);
+[$dbUser, $dbPassword, $dbHost, $dbName] = get_dbconn_var_values($options, ['u','p','h','n']);
 
-if (!$is_dry_run) {
-    if ($dbUser == null or $dbPassword == null or $dbHost == null) {
-        exit("Script defined exception: Database connection parameters are required. Please restart the script using correct parameters");
-    } else {
-        /* Checking "host" format as "host:port" or "host" only */
-        if (strpos($dbHost, ':') !== false) {
-            $dbhp = explode(':', $dbHost);
-            $dbHost = $dbhp[ 0 ];
-            $dbPort = $dbhp[ 1 ];
-        } else $dbPort = '5432';
+if (!$is_dry_run) { // not Dry run - checking conneciton params
+  $dbUser = check_param_value('Username', $dbUser);
+  $dbPassword = check_param_value('Password', $dbPassword);
+  $dbHost = check_param_value('Host', $dbHost);
+  $dbName = check_param_value('DB Name', $dbName);
 
-        if (isset($options[ "n" ])) $dbName = $options[ "n" ]; // if database name parameter is specified
-        else {
-            $dbName = $dbUser;
-            echo "DB NAME is not given. Using \"$dbUser\" database name to connect." . PHP_EOL;
-        }
-    }
+/* Checking "host" format as "host:port" or "host" only */
+  if (strpos($dbHost, ':') !== false) {
+    $dbhp = explode(':', $dbHost);
+    $dbHost = $dbhp[ 0 ];
+    $dbPort = $dbhp[ 1 ];
+    } else $dbPort = '5432';
 }
+
 If (!isset($options[ "create_table" ])) {
   if (!isset($options["file"]) || empty($options["file"])) {
       exit("Script defined exception: File path or file name is required. Please restart the script using correct parameters".PHP_EOL);
