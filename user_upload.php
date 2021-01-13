@@ -1,14 +1,16 @@
 <?php
 
 $shortopts = "u:p:h:n:";
-$longopts = ["file:","create_table:","dry_run","help"];
+$longopts = ["file:","create_table","dry_run","help"];
 
 $options = getopt($shortopts, $longopts);
 
 error_reporting(E_ERROR);
 
-/*checking user's mistakes in commands syntax*/
+/*--- HERE GOES FUNCTIONS BLOCK ---*/
+
 function check_options($shortopts, $longopts) {
+  /* function checks user's mistakes in commands syntax*/
   $argv = $_SERVER['argv'];
   $argc = $_SERVER['argc'];
   $args_list = $argv; //recieving overall list of arguments
@@ -61,21 +63,112 @@ if (!$check_result) {
   exit();
 }
 
-/*--- INITIATING HELP MESSAGE ---*/
+function request_password_hidden($prompt='') {
+
+    // function hides output
+    // and returns string entered in terminal
+
+    readline_callback_handler_install('', function(){});
+    if (isset($prompt)) {
+      echo $prompt."\n";
+    }
+    echo("Password: ");
+    $strHidden = '';
+    while (True) {
+      $strChar = stream_get_contents(STDIN, 1);
+      if ($strChar === chr(10)) {
+        break;
+      }
+      elseif (($strChar===chr(127)) && (strlen($strHidden)!=0)) {
+        $strHidden = rtrim($strHidden, $strHidden[strlen($strHidden)-1]);
+      }
+      else {
+        $strHidden .= $strChar;
+      }
+    }
+    readline_callback_handler_remove();
+    return $strHidden;
+}
+
+function get_dbconn_var_values($optionsArray, $paramKeys){
+
+  /* funcion returns values from array by given keys */
+
+  $resultingArray = array();
+  foreach ($paramKeys as $keyName) {
+    if (isset($optionsArray[$keyName])) {
+      $resultingArray[] = $optionsArray[$keyName] ;
+    }
+    else {
+      $resultingArray[] = '' ;
+    }
+  }
+  return $resultingArray;
+}
+
+function check_param_value($paramName='',$paramValue) {
+
+  /* checks for mandatory parameters' values and requests input for empy ones */
+
+  $defaultValue = '';
+  $functionToCall = 'readline';
+  switch (strtolower($paramName)) {
+    case 'username':
+      $defaultValue = 'postgres';
+      $functionToCall = 'readline';
+      break;
+    case 'password':
+      $defaultValue = 'Administrator';
+      $functionToCall = 'request_password_hidden';
+      break;
+    case 'host':
+      $defaultValue = '127.0.0.1:5432';
+      $functionToCall = 'readline';
+      break;
+    case 'db name':
+      $defaultValue = 'postgres';
+      $functionToCall = 'readline';
+      break;
+    default:
+      exit("Unable to recognize parameter name $paramName \n");
+      break;
+}
+    while (!$paramValue) {
+      echo "Parameter \"$paramName\" is not set while required".PHP_EOL;
+      $userPick = readline("\"Y/y\" to set new value OR \"N/n\" for default ($defaultValue): ");
+      if (strtoupper($userPick) === "Y") {
+        $paramValue = call_user_func($functionToCall, "Enter $paramName: ");
+      }
+      elseif (strtoupper($userPick) === "N") {
+        $paramValue = $defaultValue;
+      }
+  }
+      return $paramValue;
+}
+
+/*--- HELP MESSAGE ---*/
 const help_responce = <<<EOD
+user_upload.php [-u=<...> & -p=<...> & -h=<...> [& -n=<...>]]
+                [--create_table] [--file=<...>] [--dry_run] [--help]
 The following set of commands is specified for current PHP script.
 To define commands value both space or equality delimiters are fine.
 Example: < -u username > | < -u=username >
+• --help – outputs the list of directives with details.
 • --file [csv file name] – this is the name of the CSV to be parsed
-• --create_table – this will cause the PostgreSQL users table to be built (and no further action
-    will be taken because of the conditions of the task)
-• --dry_run – this will be used with the --file directive in case we want to run the script but not
-    insert into the DB. All other functions will be executed, but the database won't be altered
+• --create_table – this will cause the PostgreSQL "users" table to be built
+  (and no further action will be taken because of the conditions of the task)
+• --dry_run – this will be used with the --file directive in case we want
+  to run the script but not insert into the DB.
+  All other functions will be executed, but the database won't be altered
+  --- ---
+  The set of options listed below can be ommited.
+  However, user input will be requested during the script execution.
 • -u [username] – PostgreSQL username
 • -p [password] – PostgreSQL password
-• -h [host:port] – PostgreSQL host in a format: host:port. If port is not specified, default port 5432 will be set.
-• -n [DBName] – PostgreSQL database name. If not specified, "postgres" database will be used
-• --help – outputs the list of directives with details.
+• -h [host:port] – PostgreSQL host in a format: host:port.
+  If the port is not specified, default port 5432 will be set.
+• -n [DBName] – PostgreSQL database name. If not specified, "username" database will be used
+
 EOD;
 if (isset($options["help"])) exit(help_responce.PHP_EOL); // return help if parameter is specified
 
@@ -86,39 +179,38 @@ if (isset($options["dry_run"])) {
 } else $is_dry_run = false;
 
 /* --- ASSIGNING DATABASE CONNECTION PARAMETERS TO VARIABLES --- */
-if (isset($options["u"])) $dbuser = $options["u"]; // if user parameter is specified
-if (isset($options["p"])) $dbpwd = $options["p"];  // if password parameter is specified
-if (isset($options["h"])) $dbhost = $options["h"]; // if host parameter is specified
-if (!$is_dry_run) {
-    if ($dbuser == null or $dbpwd == null or $dbhost == null) {
-        exit("User exception: Database connection parameters are required. Please restart the script using correct parameters");
-    } else {
-        /* Checking "host" format as "host:port" or "host" only */
-        if (strpos($dbhost, ':') !== false) {
-            $dbhp = explode(':', $dbhost);
-            $dbhost = $dbhp[ 0 ];
-            $dbport = $dbhp[ 1 ];
-        } else $dbport = '5432';
+//if (isset($options["u"])) $dbUser = $options["u"]; // if user parameter is specified
+// if (isset($options["p"])) $dbPassword = $options["p"];  // if password parameter is specified
+// if (isset($options["h"])) $dbHost = $options["h"]; // if host parameter is specified
 
-        if (isset($options[ "n" ])) $dbname = $options[ "n" ]; // if database name parameter is specified
-        else {
-            $dbname = '';
-            echo "DB NAME is not given. Using default." . PHP_EOL;
-        }
-    }
+[$dbUser, $dbPassword, $dbHost, $dbName] = get_dbconn_var_values($options, ['u','p','h','n']);
+
+if (!$is_dry_run) { // not Dry run - checking conneciton params
+  $dbUser = check_param_value('Username', $dbUser);
+  $dbPassword = check_param_value('Password', $dbPassword);
+  $dbHost = check_param_value('Host', $dbHost);
+  $dbName = check_param_value('DB Name', $dbName);
+
+/* Checking "host" format as "host:port" or "host" only */
+  if (strpos($dbHost, ':') !== false) {
+    $dbhp = explode(':', $dbHost);
+    $dbHost = $dbhp[ 0 ];
+    $dbPort = $dbhp[ 1 ];
+    } else $dbPort = '5432';
 }
 
-if (!isset($options["file"]) || empty($options["file"])) {
-    exit("User exception: File path or file name is required. Please restart the script using correct parameters".PHP_EOL);
-}
+If (!isset($options[ "create_table" ])) {
+  if (!isset($options["file"]) || empty($options["file"])) {
+      exit("Script defined exception: File path or file name is required. Please restart the script using correct parameters".PHP_EOL);
+  }
 
-else {
-    $file_path = $options["file"]; // if --file parameter is not empty
-    if (strpos($file_path,'[') == 0 and strpos($file_path,']') == strlen($file_path) - 1) {
-        $file_path = substr($file_path,1,strlen($file_path)-2);
-    }
+  else {
+      $file_path = $options["file"]; // if --file parameter is not empty
+      if (strpos($file_path,'[') == 0 and strpos($file_path,']') == strlen($file_path) - 1) {
+          $file_path = substr($file_path,1,strlen($file_path)-2);
+      }
+  }
 }
-
 
 
 
@@ -126,6 +218,11 @@ else {
 if ($file_path != null) {
     /*   --- inserting file data into array ---   */
     $f_lines = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+
+    if ($f_lines === false) {
+      exit("file \"$file_path\" is empty. No records were found. Please try another file.\n");
+    }
+
     for ($i = 0; $i < count($f_lines); $i++) {
         $file[$i] = explode(";", $f_lines[$i]);
     }
@@ -152,18 +249,32 @@ if ($file_path != null) {
     echo "Valid emails: $email_cnt | Invalid emails:". (count($file)-$email_cnt) . PHP_EOL;
 }
 
-if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
-    echo "--create table parameter is not specified.
-File with table name to insert data does not exist".PHP_EOL;
-    exit();
-}
+// if (!isset($options["create_table"]) && !file_exists("./write_table_name.tmp")) {
+//     echo "--create table parameter is not specified.
+// File with table name to insert data does not exist".PHP_EOL;
+//     exit();
+// }
+
+$connection_string = "host=$dbHost port=$dbPort user=$dbUser password=$dbPassword dbname=$dbName";
+
 
 /*  --- HERE GOES DATABASE ACTIONS BLOCK --- */
 if ($is_dry_run) echo "DRY_RUN. No connection to the database will be made".PHP_EOL;
 else {
-    $dbconn = pg_connect("host=$dbhost port=$dbport user=$dbuser password=$dbpwd dbname=$dbname")
-    or die("Unable to establish database connection");
+    $dbconn = pg_connect($connection_string)
+    or die("Database has returned error: $connection_string
+    \"". error_get_last()['message']."\"
+    Unable to establish database connection\n");
+    // echo pg_result_error(pg_connect($connection_string,PGSQL_CONNECT_FORCE_NEW))."\n";
     echo "Connected to database successfully: $dbconn. DB name: " . pg_dbname($dbconn) . "\n";
+    // try {
+    //   $dbconn = pg_connect($connection_string);
+    // } catch (\Exception $e) {
+    //   echo $e->getMessage;
+    //   exit();
+    // }
+
+
 
     /* --- query to check if new table already exists --- */
     pg_prepare($dbconn, 'check_table_name', "SELECT table_name FROM information_schema.tables t WHERE t.table_name= $1");
@@ -172,7 +283,7 @@ else {
 /*  --- CHECKING WHETHER WE NEED TO CREATE NEW TABLE? --- */
 if (isset($options[ "create_table" ])) // parameter is specified
 {
-    $new_table_name = $options[ "create_table" ]; // putting table name into variable
+    $new_table_name = "users"; // putting table name into variable
     /* Forming a "create table" query */
     $q_create_table = "CREATE TABLE IF NOT EXISTS $new_table_name (
     id serial PRIMARY KEY NOT NULL,
@@ -192,14 +303,14 @@ if (isset($options[ "create_table" ])) // parameter is specified
             pg_query($dbconn, 'commit;');
             pg_close($dbconn);
 
-            file_put_contents("./write_table_name.tmp", $new_table_name);
-            exit("New table has been created. Table name is $new_table_name. Terminating script".PHP_EOL);
+            //file_put_contents("./write_table_name.tmp", $new_table_name);
+            exit("New table has been created. Table name is \"$new_table_name\".".PHP_EOL);
 
             /* Memorizing table name in the "*.tmp" file. On the next run this table name will be used to insert data */
         } else {
             echo "Table with name " . $t_exist . " already exists" . PHP_EOL;
             pg_close($dbconn);
-            exit ('--create_table parameter is given. Task conditions require to terminate script execution.'.PHP_EOL);
+            exit ('--create_table parameter was given. Task conditions require to terminate script execution.'.PHP_EOL);
         }
     }
 
@@ -208,7 +319,7 @@ if (isset($options[ "create_table" ])) // parameter is specified
 /*  --- INSERTING DATA FROM FILE INTO DATABASE --- */
 
 /* getting table name from file after previous --create_table run*/
-$ins_table_name = file_get_contents("./write_table_name.tmp");
+$ins_table_name = "users";
 
 /*  --- CHECKING FOR DRY_RUN --- */
 if (!$is_dry_run) {
